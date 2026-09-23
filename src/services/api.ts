@@ -11,6 +11,13 @@ import {
   RiskLevel
 } from '../types/index.ts';
 import { initialCategories, initialReports, initialUsers, maskIdentifier } from '../../server/data/mockDb.ts';
+import {
+  getFirestoreReports,
+  getFirestoreReportById,
+  createFirestoreReport,
+  updateFirestoreReportStatus,
+  verifyIdentifierInFirestore,
+} from '../lib/firebase.ts';
 
 const TOKEN_KEY = 'scamshield_auth_token';
 const USER_KEY = 'scamshield_current_user';
@@ -232,72 +239,83 @@ class ApiService {
     page?: number;
     limit?: number;
   } = {}): Promise<{ reports: Report[]; total: number; page: number; totalPages: number }> {
-    const query = new URLSearchParams();
-    if (params.search) query.set('search', params.search);
-    if (params.category) query.set('category', params.category);
-    if (params.risk) query.set('risk', params.risk);
-    if (params.status) query.set('status', params.status);
-    if (params.sort) query.set('sort', params.sort);
-    if (params.page) query.set('page', String(params.page));
-    if (params.limit) query.set('limit', String(params.limit || 12));
-
-    return this.request(`/api/reports?${query.toString()}`, {}, () => {
-      let list = getLocalReports();
-      if (params.search) {
-        const q = params.search.toLowerCase();
-        list = list.filter(
-          (r) =>
-            r.title.toLowerCase().includes(q) ||
-            r.description.toLowerCase().includes(q) ||
-            r.reportId.toLowerCase().includes(q) ||
-            r.city?.toLowerCase().includes(q) ||
-            r.state?.toLowerCase().includes(q) ||
-            r.identifiers.some((i) => i.value.toLowerCase().includes(q) || i.maskedValue.toLowerCase().includes(q))
-        );
-      }
-      if (params.category && params.category !== 'all') {
-        list = list.filter((r) => String(r.categoryId) === params.category || r.categoryName === params.category);
-      }
-      if (params.risk && params.risk !== 'all') {
-        list = list.filter((r) => r.riskLevel.toLowerCase() === params.risk?.toLowerCase());
-      }
-      if (params.status && params.status !== 'all') {
-        list = list.filter((r) => r.status.toLowerCase() === params.status?.toLowerCase());
-      }
-      if (params.sort === 'most_reported') {
-        list.sort((a, b) => b.communityUpvotes - a.communityUpvotes);
-      } else if (params.sort === 'highest_risk') {
-        const p: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
-        list.sort((a, b) => (p[b.riskLevel] || 0) - (p[a.riskLevel] || 0));
+    let list: Report[] = [];
+    try {
+      const firestoreList = await getFirestoreReports();
+      if (firestoreList && firestoreList.length > 0) {
+        list = firestoreList;
+        saveLocalReports(list);
       } else {
-        list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        list = getLocalReports();
       }
+    } catch (e) {
+      list = getLocalReports();
+    }
 
-      const total = list.length;
-      const page = params.page || 1;
-      const limit = params.limit || 12;
-      const paginated = list.slice((page - 1) * limit, page * limit);
-      return { reports: paginated, total, page, totalPages: Math.ceil(total / limit) };
-    });
+    if (params.search) {
+      const q = params.search.toLowerCase();
+      list = list.filter(
+        (r) =>
+          r.title.toLowerCase().includes(q) ||
+          r.description.toLowerCase().includes(q) ||
+          r.reportId.toLowerCase().includes(q) ||
+          r.city?.toLowerCase().includes(q) ||
+          r.state?.toLowerCase().includes(q) ||
+          r.identifiers?.some((i) => i.value.toLowerCase().includes(q) || i.maskedValue?.toLowerCase().includes(q))
+      );
+    }
+    if (params.category && params.category !== 'all') {
+      list = list.filter((r) => String(r.categoryId) === params.category || r.categoryName === params.category);
+    }
+    if (params.risk && params.risk !== 'all') {
+      list = list.filter((r) => r.riskLevel.toLowerCase() === params.risk?.toLowerCase());
+    }
+    if (params.status && params.status !== 'all') {
+      list = list.filter((r) => r.status.toLowerCase() === params.status?.toLowerCase());
+    }
+    if (params.sort === 'most_reported') {
+      list.sort((a, b) => b.communityUpvotes - a.communityUpvotes);
+    } else if (params.sort === 'highest_risk') {
+      const p: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
+      list.sort((a, b) => (p[b.riskLevel] || 0) - (p[a.riskLevel] || 0));
+    } else {
+      list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    }
+
+    const total = list.length;
+    const page = params.page || 1;
+    const limit = params.limit || 12;
+    const paginated = list.slice((page - 1) * limit, page * limit);
+    return { reports: paginated, total, page, totalPages: Math.ceil(total / limit) };
   }
 
   async getReportById(id: string): Promise<Report> {
-    return this.request(`/api/reports/${id}`, {}, () => {
-      const reports = getLocalReports();
-      const report = reports.find((r) => String(r.id) === id || r.reportId.toLowerCase() === id.toLowerCase());
-      if (!report) throw new Error('Report not found');
-      report.viewsCount = (report.viewsCount || 0) + 1;
-      saveLocalReports(reports);
-      return report;
-    });
+    try {
+      const fReport = await getFirestoreReportById(id);
+      if (fReport) return fReport;
+    } catch (e) {
+      // fallback
+    }
+    const reports = getLocalReports();
+    const report = reports.find((r) => String(r.id) === id || r.reportId.toLowerCase() === id.toLowerCase());
+    if (!report) throw new Error('Report not found');
+    report.viewsCount = (report.viewsCount || 0) + 1;
+    saveLocalReports(reports);
+    return report;
   }
 
   async getMyReports(): Promise<Report[]> {
-    return this.request('/api/reports/my', {}, () => {
-      const user = this.getLocalUser();
-      const userId = user ? user.id : 2;
-      return getLocalReports().filter((r) => r.userId === userId);
-    });
+    const user = this.getLocalUser();
+    const userId = user ? user.id : 2;
+    try {
+      const list = await getFirestoreReports();
+      if (list && list.length > 0) {
+        return list.filter((r) => r.userId === userId || String(r.userId) === String(userId));
+      }
+    } catch (e) {
+      // fallback
+    }
+    return getLocalReports().filter((r) => r.userId === userId);
   }
 
   async createReport(data: {
@@ -318,78 +336,116 @@ class ApiService {
     evidence?: { fileName: string; fileUrl: string; fileType: string; fileSizeBytes: number }[];
   }): Promise<{ message: string; report: Report }> {
     const user = this.getLocalUser();
-    return this.request(
-      '/api/reports',
-      {
-        method: 'POST',
-        body: JSON.stringify({ ...data, userId: user?.id }),
-      },
-      () => {
-        const reports = getLocalReports();
-        const nextId = reports.length + 100;
-        const reportId = `SCAM-2026-${String(nextId).padStart(6, '0')}`;
-        const cat = initialCategories.find((c) => c.id === Number(data.categoryId));
+    const cat = initialCategories.find((c) => c.id === Number(data.categoryId));
 
-        let riskLevel: RiskLevel = 'medium';
-        if (data.amountLost > 50000) riskLevel = 'critical';
-        else if (data.amountLost > 10000) riskLevel = 'high';
-        else if (data.amountLost > 0) riskLevel = 'medium';
-        else riskLevel = 'low';
+    let riskLevel: RiskLevel = 'medium';
+    if (data.amountLost > 50000) riskLevel = 'critical';
+    else if (data.amountLost > 10000) riskLevel = 'high';
+    else if (data.amountLost > 0) riskLevel = 'medium';
+    else riskLevel = 'low';
 
-        const newRep: Report = {
-          id: Date.now(),
-          reportId,
-          userId: user?.id || 2,
-          reporterName: data.reporterName || user?.name || 'Anonymous Citizen',
-          reporterEmail: data.reporterEmail || user?.email || 'reporter@example.com',
-          categoryId: Number(data.categoryId),
-          categoryName: cat?.name || 'Scam Report',
-          title: data.title,
-          description: data.description,
-          incidentDate: data.incidentDate,
-          amountLost: Number(data.amountLost) || 0,
-          currency: data.currency || 'INR',
-          country: data.country || 'India',
-          state: data.state || 'Maharashtra',
-          city: data.city || 'Mumbai',
-          platform: data.platform || 'Online',
-          scamMethod: data.scamMethod,
-          riskLevel,
-          status: 'Submitted',
-          communityUpvotes: 1,
-          viewsCount: 1,
-          identifiers: data.identifiers.map((ident, i) => ({
-            id: Date.now() + i,
-            type: ident.type,
-            value: ident.value,
-            maskedValue: maskIdentifier(ident.type, ident.value),
-          })),
-          evidence: data.evidence?.map((e, i) => ({ id: Date.now() + i, ...e })),
-          moderationHistory: [],
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
+    const formattedIdentifiers = data.identifiers.map((ident, i) => ({
+      id: Date.now() + i,
+      type: ident.type,
+      value: ident.value,
+      maskedValue: maskIdentifier(ident.type, ident.value),
+    }));
 
-        reports.unshift(newRep);
-        saveLocalReports(reports);
+    try {
+      const firestoreRep = await createFirestoreReport({
+        title: data.title,
+        description: data.description,
+        incidentDate: data.incidentDate,
+        categoryId: Number(data.categoryId),
+        categoryName: cat?.name || 'Scam Report',
+        reporterName: data.reporterName || user?.name || 'Anonymous Citizen',
+        reporterEmail: data.reporterEmail || user?.email || 'reporter@example.com',
+        userId: user?.id || 2,
+        amountLost: Number(data.amountLost) || 0,
+        currency: data.currency || 'INR',
+        country: data.country || 'India',
+        state: data.state || 'Maharashtra',
+        city: data.city || 'Mumbai',
+        platform: data.platform || 'Online',
+        scamMethod: data.scamMethod,
+        riskLevel,
+        status: 'Submitted',
+        identifiers: formattedIdentifiers,
+      });
 
-        // add notification
-        const notifs = getLocalNotifications();
-        notifs.unshift({
-          id: Date.now(),
-          userId: user?.id || 2,
-          title: 'Scam Report Submitted',
-          message: `Your scam report ${reportId} has been submitted successfully and queued for review.`,
-          type: 'info',
-          reportId,
-          readStatus: false,
-          createdAt: new Date().toISOString(),
-        });
-        localStorage.setItem(LOCAL_NOTIFS_KEY, JSON.stringify(notifs));
+      // Update local storage cache
+      const reports = getLocalReports();
+      reports.unshift(firestoreRep);
+      saveLocalReports(reports);
 
-        return { message: 'Report submitted successfully', report: newRep };
-      }
-    );
+      // add notification
+      const notifs = getLocalNotifications();
+      notifs.unshift({
+        id: Date.now(),
+        userId: user?.id || 2,
+        title: 'Scam Report Submitted',
+        message: `Your scam report ${firestoreRep.reportId} has been submitted to the database and queued for review.`,
+        type: 'info',
+        reportId: firestoreRep.reportId,
+        readStatus: false,
+        createdAt: new Date().toISOString(),
+      });
+      localStorage.setItem(LOCAL_NOTIFS_KEY, JSON.stringify(notifs));
+
+      return { message: 'Report submitted successfully to database', report: firestoreRep };
+    } catch (err) {
+      console.warn('Firestore submission failed, using local persistence:', err);
+      const reports = getLocalReports();
+      const nextId = reports.length + 100;
+      const reportId = `SCAM-2026-${String(nextId).padStart(6, '0')}`;
+
+      const newRep: Report = {
+        id: Date.now(),
+        reportId,
+        userId: user?.id || 2,
+        reporterName: data.reporterName || user?.name || 'Anonymous Citizen',
+        reporterEmail: data.reporterEmail || user?.email || 'reporter@example.com',
+        categoryId: Number(data.categoryId),
+        categoryName: cat?.name || 'Scam Report',
+        title: data.title,
+        description: data.description,
+        incidentDate: data.incidentDate,
+        amountLost: Number(data.amountLost) || 0,
+        currency: data.currency || 'INR',
+        country: data.country || 'India',
+        state: data.state || 'Maharashtra',
+        city: data.city || 'Mumbai',
+        platform: data.platform || 'Online',
+        scamMethod: data.scamMethod,
+        riskLevel,
+        status: 'Submitted',
+        communityUpvotes: 1,
+        viewsCount: 1,
+        identifiers: formattedIdentifiers,
+        evidence: data.evidence?.map((e, i) => ({ id: Date.now() + i, ...e })),
+        moderationHistory: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      reports.unshift(newRep);
+      saveLocalReports(reports);
+
+      const notifs = getLocalNotifications();
+      notifs.unshift({
+        id: Date.now(),
+        userId: user?.id || 2,
+        title: 'Scam Report Submitted',
+        message: `Your scam report ${reportId} has been submitted successfully and queued for review.`,
+        type: 'info',
+        reportId,
+        readStatus: false,
+        createdAt: new Date().toISOString(),
+      });
+      localStorage.setItem(LOCAL_NOTIFS_KEY, JSON.stringify(notifs));
+
+      return { message: 'Report submitted successfully', report: newRep };
+    }
   }
 
   // ---------------- VERIFICATION ----------------
@@ -493,7 +549,45 @@ class ApiService {
 
   // ---------------- ADMIN ----------------
   async getAdminReports(): Promise<Report[]> {
+    try {
+      const reports = await getFirestoreReports();
+      if (reports && reports.length > 0) return reports;
+    } catch (e) {
+      console.warn('Firestore getAdminReports fallback:', e);
+    }
     return this.request('/api/admin/reports', {}, () => getLocalReports());
+  }
+
+  async updateReportStatus(id: number | string, status: string): Promise<Report> {
+    try {
+      const updated = await updateFirestoreReportStatus(id, status as ReportStatus);
+      const reports = getLocalReports();
+      const rep = reports.find((r) => String(r.id) === String(id) || r.reportId === String(id));
+      if (rep) {
+        rep.status = status as ReportStatus;
+        rep.updatedAt = updated.updatedAt;
+        saveLocalReports(reports);
+      }
+      return updated;
+    } catch (e) {
+      console.warn('Firestore status update fallback:', e);
+    }
+    return this.request(
+      `/api/admin/reports/${id}/status`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({ status }),
+      },
+      () => {
+        const reports = getLocalReports();
+        const rep = reports.find((r) => String(r.id) === String(id) || r.reportId === String(id));
+        if (!rep) throw new Error('Report not found');
+        rep.status = status as ReportStatus;
+        rep.updatedAt = new Date().toISOString();
+        saveLocalReports(reports);
+        return rep;
+      }
+    );
   }
 
   async reviewReport(

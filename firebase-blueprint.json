@@ -1,0 +1,172 @@
+{
+  "entities": {
+    "Report": {
+      "title": "Report",
+      "description": "A user-submitted scam report detailing an incident, fraudulent identifiers, and current review status.",
+      "type": "object",
+      "properties": {
+        "reportId": {
+          "type": "string",
+          "description": "Unique human-readable identifier for the report, e.g. SCAM-2026-000101",
+          "maxLength": 64
+        },
+        "title": {
+          "type": "string",
+          "description": "Summary title of the scam incident",
+          "maxLength": 200
+        },
+        "description": {
+          "type": "string",
+          "description": "Detailed explanation of what occurred",
+          "maxLength": 5000
+        },
+        "categoryId": {
+          "type": "number",
+          "description": "Numeric ID representing the scam category"
+        },
+        "categoryName": {
+          "type": "string",
+          "description": "Name of the scam category, e.g. Online Shopping, Job Scam",
+          "maxLength": 100
+        },
+        "incidentDate": {
+          "type": "string",
+          "description": "Date when the incident took place (YYYY-MM-DD)",
+          "maxLength": 20
+        },
+        "reporterName": {
+          "type": "string",
+          "description": "Full name of the reporting person",
+          "maxLength": 100
+        },
+        "reporterEmail": {
+          "type": "string",
+          "description": "Email address of the reporter",
+          "maxLength": 150
+        },
+        "userId": {
+          "type": "string",
+          "description": "Optional user ID of the reporter if registered",
+          "maxLength": 128
+        },
+        "status": {
+          "type": "string",
+          "description": "Review status of the report",
+          "enum": ["Submitted", "Under Review", "Verified", "Rejected"]
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "ISO timestamp of report creation"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "ISO timestamp of last update"
+        }
+      },
+      "required": ["reportId", "title", "description", "incidentDate", "reporterName", "reporterEmail", "status"]
+    },
+    "Category": {
+      "title": "Category",
+      "description": "A scam category catalog item.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number",
+          "description": "Numeric category identifier"
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the category",
+          "maxLength": 100
+        },
+        "slug": {
+          "type": "string",
+          "description": "Slug for routing and filtering",
+          "maxLength": 50
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of the scam type",
+          "maxLength": 300
+        },
+        "severityLevel": {
+          "type": "string",
+          "description": "Severity level classification",
+          "enum": ["low", "medium", "high", "critical"]
+        }
+      },
+      "required": ["id", "name", "slug"]
+    },
+    "VerificationSearch": {
+      "title": "VerificationSearch",
+      "description": "A record of an identifier verification query.",
+      "type": "object",
+      "properties": {
+        "identifierType": {
+          "type": "string",
+          "description": "Type of identifier verified (phone, email, url)",
+          "enum": ["phone", "email", "url"]
+        },
+        "identifierValue": {
+          "type": "string",
+          "description": "Normalized identifier query value",
+          "maxLength": 500
+        },
+        "resultFound": {
+          "type": "boolean",
+          "description": "Whether matching fraudulent reports were found"
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "ISO timestamp of verification query"
+        }
+      },
+      "required": ["identifierType", "identifierValue", "resultFound"]
+    },
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile document storing role and account metadata.",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "description": "User email address",
+          "maxLength": 150
+        },
+        "name": {
+          "type": "string",
+          "description": "User full name",
+          "maxLength": 100
+        },
+        "role": {
+          "type": "string",
+          "description": "Assigned authorization role",
+          "enum": ["user", "admin"]
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Account registration timestamp"
+        }
+      },
+      "required": ["email", "name", "role"]
+    }
+  },
+  "firestore": {
+    "/reports/{reportId}": {
+      "schema": "Report",
+      "description": "Collection of community submitted scam reports."
+    },
+    "/categories/{categoryId}": {
+      "schema": "Category",
+      "description": "Catalog of available scam categories."
+    },
+    "/verificationSearches/{searchId}": {
+      "schema": "VerificationSearch",
+      "description": "Historical log of verification queries for analytics and fraud detection."
+    },
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile records indexed by auth ID."
+    }
+  }
+}

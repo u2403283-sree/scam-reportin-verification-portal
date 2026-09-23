@@ -1,622 +1,282 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import {
-  FilePlus2,
-  ShieldCheck,
-  AlertTriangle,
-  UploadCloud,
-  CheckCircle2,
-  Plus,
-  Trash2,
-  Lock,
-  ArrowRight,
-  Info
-} from 'lucide-react';
-import { api } from '../services/api.ts';
-import { useAuth } from '../context/AuthContext.tsx';
-import { useToast } from '../context/ToastContext.tsx';
-import { Category, IdentifierType, Report } from '../types/index.ts';
-import { maskIdentifier } from '../../server/data/mockDb.ts';
-import { Modal } from '../components/ui/Modal.tsx';
+import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { addReport, SCAM_TYPES } from '../services/simpleReportService.ts';
 
-interface IdentifierEntry {
-  type: IdentifierType;
-  value: string;
-}
-
+/**
+ * ReportScamPage.tsx
+ * -------------------------------------------------------------
+ * A simple form for reporting suspected scams.
+ * Strict College Project Constraints:
+ * - Only asks for basic non-sensitive fields.
+ * - NO bank details, NO passwords, NO Aadhaar, NO OTPs, NO uploads.
+ * - Simple manual JavaScript validation with error messages below fields.
+ */
 export const ReportScamPage: React.FC = () => {
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const { user } = useAuth();
-  const { showToast } = useToast();
-
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submittedReport, setSubmittedReport] = useState<Report | null>(null);
-
-  // Form State
-  const [reporterName, setReporterName] = useState(user?.name || '');
-  const [reporterEmail, setReporterEmail] = useState(user?.email || '');
-
-  const [categoryId, setCategoryId] = useState<number>(1);
-  const [title, setTitle] = useState('');
+  // Form input states
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [scamType, setScamType] = useState(SCAM_TYPES[0]);
+  const [reportedInfo, setReportedInfo] = useState('');
+  const [subject, setSubject] = useState('');
   const [description, setDescription] = useState('');
-  const [incidentDate, setIncidentDate] = useState(new Date().toISOString().split('T')[0]);
-  const [amountLost, setAmountLost] = useState<string>('0');
-  const [currency, setCurrency] = useState('INR');
-  const [country, setCountry] = useState('India');
-  const [state, setState] = useState('Maharashtra');
-  const [city, setCity] = useState('');
-  const [platform, setPlatform] = useState('Telegram');
-  const [scamMethod, setScamMethod] = useState('');
 
-  // Identifiers List
-  const initialType = (searchParams.get('type') as IdentifierType) || 'phone';
-  const initialVal = searchParams.get('value') || '';
+  // Field validation error states
+  const [errors, setErrors] = useState<{
+    email?: string;
+    phone?: string;
+    reportedInfo?: string;
+    subject?: string;
+    description?: string;
+  }>({});
 
-  const [identifiers, setIdentifiers] = useState<IdentifierEntry[]>([
-    { type: initialType, value: initialVal },
-  ]);
+  // Success message after submission
+  const [submittedReportId, setSubmittedReportId] = useState<string | null>(null);
 
-  // Evidence files simulation
-  const [evidenceFiles, setEvidenceFiles] = useState<
-    { fileName: string; fileUrl: string; fileType: string; fileSizeBytes: number }[]
-  >([]);
+  /**
+   * Validate fields using simple rules
+   */
+  const validateForm = () => {
+    const newErrors: typeof errors = {};
 
-  const [confirmedAccurate, setConfirmedAccurate] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
-
-  useEffect(() => {
-    async function loadCats() {
-      try {
-        const data = await api.getCategories();
-        setCategories(data);
-        if (data.length > 0 && !categoryId) {
-          setCategoryId(data[0].id);
-        }
-      } catch (e) {
-        console.error(e);
-      }
-    }
-    loadCats();
-  }, []);
-
-  useEffect(() => {
-    if (user) {
-      if (!reporterName) setReporterName(user.name);
-      if (!reporterEmail) setReporterEmail(user.email);
-    }
-  }, [user]);
-
-  const addIdentifierField = () => {
-    setIdentifiers([...identifiers, { type: 'phone', value: '' }]);
-  };
-
-  const removeIdentifierField = (index: number) => {
-    if (identifiers.length === 1) return;
-    setIdentifiers(identifiers.filter((_, i) => i !== index));
-  };
-
-  const updateIdentifier = (index: number, field: 'type' | 'value', val: any) => {
-    const next = [...identifiers];
-    next[index] = { ...next[index], [field]: val };
-    setIdentifiers(next);
-  };
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    const newFiles = Array.from(files).map((f) => ({
-      fileName: f.name,
-      fileUrl: URL.createObjectURL(f),
-      fileType: f.type || 'image/png',
-      fileSizeBytes: f.size,
-    }));
-
-    setEvidenceFiles([...evidenceFiles, ...newFiles]);
-    showToast(`Attached ${files.length} evidence file(s)`, 'success');
-  };
-
-  const validate = (): boolean => {
-    const errs: Record<string, string> = {};
-    if (!title.trim()) errs.title = 'Please enter a descriptive scam title';
-    if (!description.trim()) errs.description = 'Please describe what occurred';
-    if (description.trim().length < 20)
-      errs.description = 'Please provide at least 20 characters for description';
-    if (!confirmedAccurate) errs.confirm = 'Please confirm the accuracy declaration';
-
-    const hasValidIdent = identifiers.some((i) => i.value.trim().length > 0);
-    if (!hasValidIdent) {
-      errs.identifiers = 'Please provide at least one phone, email, URL, or identifier';
+    // 1. Email validation: must contain '@' and '.'
+    if (!email.trim()) {
+      newErrors.email = 'Email address is required.';
+    } else if (!email.includes('@') || !email.includes('.')) {
+      newErrors.email = 'Please enter a valid email address (must contain @ and .)';
     }
 
-    setErrors(errs);
-    return Object.keys(errs).length === 0;
+    // 2. Phone validation: exactly 10 digits
+    const digitsOnly = phone.replace(/\D/g, '');
+    if (!phone.trim()) {
+      newErrors.phone = 'Phone number is required.';
+    } else if (digitsOnly.length !== 10) {
+      newErrors.phone = 'Phone number must contain exactly 10 digits.';
+    }
+
+    // 3. Suspicious information reported
+    if (!reportedInfo.trim()) {
+      newErrors.reportedInfo = 'Please enter the suspicious phone number, email, or website.';
+    }
+
+    // 4. Subject
+    if (!subject.trim()) {
+      newErrors.subject = 'Subject / short description is required.';
+    }
+
+    // 5. Description
+    if (!description.trim()) {
+      newErrors.description = 'Please provide a detailed description of the incident.';
+    } else if (description.trim().length < 10) {
+      newErrors.description = 'Description should be at least 10 characters long.';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  /**
+   * Handle form submit
+   */
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validate()) {
-      showToast('Please check the highlighted required fields.', 'error');
+
+    if (!validateForm()) {
       return;
     }
 
-    setIsSubmitting(true);
-    try {
-      const validIdents = identifiers.filter((i) => i.value.trim().length > 0);
-      const res = await api.createReport({
-        reporterName: reporterName.trim() || 'Anonymous Citizen',
-        reporterEmail: reporterEmail.trim() || 'citizen@scamshield.demo',
-        categoryId,
-        title: title.trim(),
-        description: description.trim(),
-        incidentDate,
-        amountLost: parseFloat(amountLost) || 0,
-        currency,
-        country,
-        state,
-        city: city.trim(),
-        platform,
-        scamMethod: scamMethod.trim(),
-        identifiers: validIdents,
-        evidence: evidenceFiles,
-      });
+    // Save report to service (and LocalStorage)
+    const newReport = addReport({
+      reporterName: name,
+      reporterEmail: email,
+      reporterPhone: phone,
+      scamType,
+      reportedInfo,
+      subject,
+      description,
+    });
 
-      setSubmittedReport(res.report);
-      showToast('Scam report filed successfully!', 'success');
-    } catch (err: any) {
-      showToast(err.message || 'Failed to submit report. Please try again.', 'error');
-    } finally {
-      setIsSubmitting(false);
-    }
+    // Show success banner with the generated ID
+    setSubmittedReportId(newReport.id);
+
+    // Reset form fields
+    setName('');
+    setEmail('');
+    setPhone('');
+    setReportedInfo('');
+    setSubject('');
+    setDescription('');
+    setErrors({});
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-      {/* Header */}
-      <div className="text-center mb-10">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-950/60 border border-rose-500/30 text-rose-300 text-xs font-mono mb-3">
-          <FilePlus2 className="w-3.5 h-3.5" />
-          <span>Incident Submission Channel</span>
-        </div>
-        <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white">
-          Report a Scam
-        </h1>
-        <p className="mt-2 text-sm text-slate-300 max-w-xl mx-auto leading-relaxed">
-          Help protect others by sharing information about suspicious activity. All identifying personal contact info is masked before public display.
+    <div className="max-w-2xl mx-auto px-4 py-8">
+      {/* Page Title */}
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Report a Scam</h1>
+        <p className="text-sm text-gray-600 mt-1">
+          Fill out this simple form to submit information about a suspected scam.
         </p>
       </div>
 
-      {/* Form Container */}
-      <form onSubmit={handleSubmit} className="glass-panel p-6 sm:p-10 rounded-2xl border border-slate-800 space-y-8 shadow-2xl">
-        {/* SECTION 1: Reporter Information */}
-        <div>
-          <h3 className="text-xs font-mono uppercase tracking-wider text-sky-400 mb-4 flex items-center gap-2">
-            <Lock className="w-4 h-4" />
-            <span>1. Reporter Information (Private & Confidential)</span>
-          </h3>
+      {/* Safety Notice: We never ask for sensitive financial data */}
+      <div className="bg-blue-50 border border-blue-200 text-blue-900 text-xs rounded p-3 mb-6">
+        <strong>Privacy Notice:</strong> We do not ask for bank account numbers, passwords, OTPs, or Aadhaar details. Never share financial credentials with anyone.
+      </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                Full Name (Optional)
-              </label>
-              <input
-                type="text"
-                value={reporterName}
-                onChange={(e) => setReporterName(e.target.value)}
-                placeholder="e.g. Aarav Sharma"
-                className="w-full px-3.5 py-2.5 rounded-lg bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                Email Address (For Status Updates)
-              </label>
-              <input
-                type="email"
-                value={reporterEmail}
-                onChange={(e) => setReporterEmail(e.target.value)}
-                placeholder="e.g. yourname@example.com"
-                className="w-full px-3.5 py-2.5 rounded-lg bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none"
-              />
-            </div>
-          </div>
-          <p className="mt-2 text-[11px] text-slate-400">
-            * Your personal email and full name will never be exposed on the public scam database.
+      {/* Success Notification */}
+      {submittedReportId && (
+        <div className="bg-green-50 border border-green-300 text-green-800 p-4 rounded mb-6">
+          <p className="font-bold text-base">Report Submitted Successfully!</p>
+          <p className="text-sm mt-1">
+            Your report ID is <span className="font-mono font-bold">{submittedReportId}</span>.
+            The report has been saved and queued for review.
           </p>
+          <div className="mt-3 flex gap-3 text-sm">
+            <Link to="/reports" className="text-green-800 underline font-medium">
+              View in Reports Table &rarr;
+            </Link>
+            <Link to="/check" className="text-green-800 underline font-medium">
+              Verify in Search &rarr;
+            </Link>
+          </div>
         </div>
+      )}
 
-        <hr className="border-slate-800" />
-
-        {/* SECTION 2: Scam Details */}
+      {/* Report Form */}
+      <form onSubmit={handleSubmit} className="bg-white border border-gray-300 rounded p-6 shadow-sm space-y-4">
+        {/* Name Field (Optional) */}
         <div>
-          <h3 className="text-xs font-mono uppercase tracking-wider text-sky-400 mb-4 flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4" />
-            <span>2. Scam Incident Details</span>
-          </h3>
-
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                  Scam Category <span className="text-rose-400">*</span>
-                </label>
-                <select
-                  value={categoryId}
-                  onChange={(e) => setCategoryId(Number(e.target.value))}
-                  className="w-full px-3.5 py-2.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none"
-                >
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                  Platform / Channel Used
-                </label>
-                <select
-                  value={platform}
-                  onChange={(e) => setPlatform(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none"
-                >
-                  <option value="Telegram">Telegram Channel / DM</option>
-                  <option value="WhatsApp">WhatsApp Message / Group</option>
-                  <option value="SMS">SMS Text Message</option>
-                  <option value="Direct Call">Direct Phone Call (Vishing)</option>
-                  <option value="Instagram">Instagram Post / DM</option>
-                  <option value="Google Search">Google Sponsored Search Ad</option>
-                  <option value="Website">Fraudulent Website / E-commerce</option>
-                  <option value="Email">Phishing Email</option>
-                  <option value="Other">Other Media</option>
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                Scam Title <span className="text-rose-400">*</span>
-              </label>
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="e.g. Fake Electricity Bill Disconnection Warning SMS"
-                className={`w-full px-3.5 py-2.5 rounded-lg bg-slate-900 border text-white placeholder-slate-500 text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none ${
-                  errors.title ? 'border-rose-500' : 'border-slate-700'
-                }`}
-              />
-              {errors.title && <p className="mt-1 text-xs text-rose-400">{errors.title}</p>}
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                Detailed Description <span className="text-rose-400">*</span>
-              </label>
-              <textarea
-                rows={4}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Explain what happened: what claims were made, what apps they asked to install, what payment methods were requested..."
-                className={`w-full px-3.5 py-2.5 rounded-lg bg-slate-900 border text-white placeholder-slate-500 text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none ${
-                  errors.description ? 'border-rose-500' : 'border-slate-700'
-                }`}
-              />
-              {errors.description && (
-                <p className="mt-1 text-xs text-rose-400">{errors.description}</p>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                  Date of Incident
-                </label>
-                <input
-                  type="date"
-                  value={incidentDate}
-                  onChange={(e) => setIncidentDate(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                  Amount Lost (₹)
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={amountLost}
-                  onChange={(e) => setAmountLost(e.target.value)}
-                  placeholder="0 if none"
-                  className="w-full px-3.5 py-2.5 rounded-lg bg-slate-900 border border-slate-700 text-white font-mono text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5">Currency</label>
-                <input
-                  type="text"
-                  value={currency}
-                  onChange={(e) => setCurrency(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-lg bg-slate-900 border border-slate-700 text-white font-mono text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5">Country</label>
-                <input
-                  type="text"
-                  value={country}
-                  onChange={(e) => setCountry(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                  State / Province
-                </label>
-                <input
-                  type="text"
-                  value={state}
-                  onChange={(e) => setState(e.target.value)}
-                  placeholder="e.g. Maharashtra"
-                  className="w-full px-3.5 py-2.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5">City</label>
-                <input
-                  type="text"
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  placeholder="e.g. Mumbai"
-                  className="w-full px-3.5 py-2.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <hr className="border-slate-800" />
-
-        {/* SECTION 3: Identifiers Involved */}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-xs font-mono uppercase tracking-wider text-sky-400 flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4" />
-              <span>3. Contact / Identifier Involved</span>
-            </h3>
-            <button
-              type="button"
-              onClick={addIdentifierField}
-              className="inline-flex items-center gap-1 text-xs text-sky-400 hover:text-sky-300 font-medium"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Add Identifier</span>
-            </button>
-          </div>
-          <p className="text-xs text-slate-400 mb-4 leading-relaxed">
-            Specify the phone number, website link, email, or bank account used by the scammer.
-          </p>
-
-          <div className="space-y-3">
-            {identifiers.map((ident, idx) => (
-              <div
-                key={idx}
-                className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-3"
-              >
-                <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-                  <div className="w-full sm:w-48 shrink-0">
-                    <label className="block text-[11px] text-slate-400 mb-1">Identifier Type</label>
-                    <select
-                      value={ident.type}
-                      onChange={(e) =>
-                        updateIdentifier(idx, 'type', e.target.value as IdentifierType)
-                      }
-                      className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-white text-xs focus:ring-2 focus:ring-sky-500 focus:outline-none"
-                    >
-                      <option value="phone">Phone Number</option>
-                      <option value="email">Email Address</option>
-                      <option value="url">Website URL</option>
-                      <option value="bank_account">Bank Account / IFSC</option>
-                      <option value="social">Social Media Handle</option>
-                      <option value="other">Other Identifier</option>
-                    </select>
-                  </div>
-
-                  <div className="flex-1 w-full">
-                    <label className="block text-[11px] text-slate-400 mb-1">
-                      Raw Value (e.g. +91 9876543210 or URL)
-                    </label>
-                    <input
-                      type="text"
-                      value={ident.value}
-                      onChange={(e) => updateIdentifier(idx, 'value', e.target.value)}
-                      placeholder={
-                        ident.type === 'phone'
-                          ? '+91 98765 43210'
-                          : ident.type === 'email'
-                          ? 'fraud@example.com'
-                          : ident.type === 'url'
-                          ? 'https://fake-bank-login.demo'
-                          : ident.type === 'bank_account'
-                          ? '50100234981245'
-                          : 'identifier value'
-                      }
-                      className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-white font-mono text-xs focus:ring-2 focus:ring-sky-500 focus:outline-none"
-                    />
-                  </div>
-
-                  {identifiers.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeIdentifierField(idx)}
-                      className="text-rose-400 hover:text-rose-300 p-2 sm:mt-5 transition-colors"
-                      aria-label="Remove identifier"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-
-                {ident.value && (
-                  <div className="flex items-center gap-2 text-[11px] text-slate-400 bg-slate-950/60 p-2 rounded-lg font-mono">
-                    <span className="text-emerald-400">Masked Public Preview:</span>
-                    <span className="text-white font-bold">
-                      {maskIdentifier(ident.type, ident.value)}
-                    </span>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-          {errors.identifiers && (
-            <p className="mt-2 text-xs text-rose-400">{errors.identifiers}</p>
-          )}
-        </div>
-
-        <hr className="border-slate-800" />
-
-        {/* SECTION 4: Evidence Upload */}
-        <div>
-          <h3 className="text-xs font-mono uppercase tracking-wider text-sky-400 mb-3 flex items-center gap-2">
-            <UploadCloud className="w-4 h-4" />
-            <span>4. Evidence Attachment (Screenshots, PDFs, SMS Records)</span>
-          </h3>
-
-          <div className="border-2 border-dashed border-slate-800 hover:border-sky-500/50 rounded-xl p-6 text-center bg-slate-900/40 transition-colors">
-            <input
-              type="file"
-              id="evidence-upload"
-              multiple
-              accept="image/*,.pdf"
-              onChange={handleFileUpload}
-              className="hidden"
-            />
-            <label
-              htmlFor="evidence-upload"
-              className="flex flex-col items-center justify-center cursor-pointer"
-            >
-              <UploadCloud className="w-10 h-10 text-sky-400 mb-2" />
-              <p className="text-sm font-semibold text-white">Click to upload evidence documents</p>
-              <p className="text-xs text-slate-400 mt-1">
-                PNG, JPG, or PDF up to 10MB each. Redacted bank receipts or chat transcripts.
-              </p>
-            </label>
-          </div>
-
-          {evidenceFiles.length > 0 && (
-            <div className="mt-4 space-y-2">
-              <span className="text-xs font-mono text-slate-400">Attached files:</span>
-              <div className="flex flex-wrap gap-2">
-                {evidenceFiles.map((file, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-300 font-mono"
-                  >
-                    <span>{file.fileName}</span>
-                    <button
-                      type="button"
-                      onClick={() => setEvidenceFiles(evidenceFiles.filter((_, i) => i !== idx))}
-                      className="text-slate-500 hover:text-rose-400 ml-1"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        <hr className="border-slate-800" />
-
-        {/* SECTION 5: Accuracy Confirmation */}
-        <div className="space-y-4">
-          <label className="flex items-start gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={confirmedAccurate}
-              onChange={(e) => setConfirmedAccurate(e.target.checked)}
-              className="mt-1 w-4 h-4 rounded border-slate-700 bg-slate-900 text-sky-600 focus:ring-sky-500"
-            />
-            <span className="text-xs text-slate-300 leading-relaxed">
-              I confirm that the information provided is accurate to the best of my knowledge and that this report is submitted in good faith for public cyber defense.
-            </span>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Your Name <span className="text-gray-400 font-normal">(Optional)</span>
           </label>
-          {errors.confirm && <p className="text-xs text-rose-400">{errors.confirm}</p>}
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. Rahul Sharma"
+            className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
+          />
+        </div>
 
+        {/* Email Field (Required) */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Your Email <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="e.g. user@example.com"
+            className={`w-full border rounded px-3 py-2 text-sm focus:outline-none ${
+              errors.email ? 'border-red-500 bg-red-50' : 'border-gray-300 focus:border-blue-600'
+            }`}
+          />
+          {errors.email && <p className="text-red-600 text-xs mt-1">{errors.email}</p>}
+        </div>
+
+        {/* Phone Number Field (Required, exactly 10 digits) */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Your Phone Number (10 digits) <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="tel"
+            maxLength={10}
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="e.g. 9876543210"
+            className={`w-full border rounded px-3 py-2 text-sm focus:outline-none ${
+              errors.phone ? 'border-red-500 bg-red-50' : 'border-gray-300 focus:border-blue-600'
+            }`}
+          />
+          {errors.phone && <p className="text-red-600 text-xs mt-1">{errors.phone}</p>}
+        </div>
+
+        {/* Scam Type Dropdown */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Scam Type <span className="text-red-500">*</span>
+          </label>
+          <select
+            value={scamType}
+            onChange={(e) => setScamType(e.target.value)}
+            className="w-full border border-gray-300 rounded px-3 py-2 text-sm bg-white focus:outline-none focus:border-blue-600"
+          >
+            {SCAM_TYPES.map((type) => (
+              <option key={type} value={type}>
+                {type}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Suspicious Info Field */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Suspicious Information (Phone / Email / Website) <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            value={reportedInfo}
+            onChange={(e) => setReportedInfo(e.target.value)}
+            placeholder="e.g. 9876543210 or fake-jobs@scam.com or fake-store.com"
+            className={`w-full border rounded px-3 py-2 text-sm focus:outline-none ${
+              errors.reportedInfo ? 'border-red-500 bg-red-50' : 'border-gray-300 focus:border-blue-600'
+            }`}
+          />
+          {errors.reportedInfo && (
+            <p className="text-red-600 text-xs mt-1">{errors.reportedInfo}</p>
+          )}
+        </div>
+
+        {/* Subject / Short Description */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Subject / Short Description <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            value={subject}
+            onChange={(e) => setSubject(e.target.value)}
+            placeholder="e.g. Received fake job letter asking for security deposit"
+            className={`w-full border rounded px-3 py-2 text-sm focus:outline-none ${
+              errors.subject ? 'border-red-500 bg-red-50' : 'border-gray-300 focus:border-blue-600'
+            }`}
+          />
+          {errors.subject && <p className="text-red-600 text-xs mt-1">{errors.subject}</p>}
+        </div>
+
+        {/* Full Description */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Description <span className="text-red-500">*</span>
+          </label>
+          <textarea
+            rows={4}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Explain what happened: what message did they send, what did they claim, etc."
+            className={`w-full border rounded px-3 py-2 text-sm focus:outline-none ${
+              errors.description ? 'border-red-500 bg-red-50' : 'border-gray-300 focus:border-blue-600'
+            }`}
+          />
+          {errors.description && (
+            <p className="text-red-600 text-xs mt-1">{errors.description}</p>
+          )}
+        </div>
+
+        {/* Submit Button */}
+        <div className="pt-2">
           <button
             type="submit"
-            disabled={isSubmitting}
-            className="w-full sm:w-auto px-8 py-3 rounded-xl bg-sky-600 hover:bg-sky-500 disabled:bg-slate-800 text-white font-semibold text-sm transition-all shadow-lg shadow-sky-600/30 cursor-pointer disabled:cursor-not-allowed"
+            className="w-full sm:w-auto px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded text-sm transition-colors cursor-pointer"
           >
-            {isSubmitting ? (
-              <span className="flex items-center justify-center gap-2">
-                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                <span>Encrypting & Submitting...</span>
-              </span>
-            ) : (
-              <span>Submit Scam Report</span>
-            )}
+            Submit Report
           </button>
         </div>
       </form>
-
-      {/* Success Modal */}
-      {submittedReport && (
-        <Modal
-          isOpen={!!submittedReport}
-          onClose={() => navigate(`/reports/${submittedReport.reportId}`)}
-          title="Scam Report Filed Successfully"
-          maxWidth="md"
-        >
-          <div className="text-center py-4 space-y-4">
-            <div className="mx-auto w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center">
-              <CheckCircle2 className="w-7 h-7" />
-            </div>
-
-            <div>
-              <h4 className="text-lg font-bold text-white">Report Registered</h4>
-              <p className="text-xs text-slate-300 mt-1">
-                Your report has been assigned unique identifier:
-              </p>
-              <div className="mt-3 p-3 rounded-lg bg-slate-950 border border-slate-800 font-mono text-lg font-bold text-sky-400">
-                {submittedReport.reportId}
-              </div>
-            </div>
-
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Our moderation team will audit the reported identifiers and evidence. Thank you for safeguarding our digital community.
-            </p>
-
-            <div className="pt-4 flex flex-col sm:flex-row gap-3">
-              <button
-                onClick={() => navigate(`/reports/${submittedReport.reportId}`)}
-                className="flex-1 px-4 py-2.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold transition-colors"
-              >
-                View Report Details
-              </button>
-              <button
-                onClick={() => navigate('/dashboard')}
-                className="flex-1 px-4 py-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-colors"
-              >
-                Go to Dashboard
-              </button>
-            </div>
-          </div>
-        </Modal>
-      )}
     </div>
   );
 };

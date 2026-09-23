@@ -1,166 +1,124 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
-import {
-  ShieldAlert,
-  ShieldCheck,
-  Lock,
-  Database,
-  Users,
-  Search,
-  CheckCircle2,
-  Code2,
-  Cpu,
-  Layers,
-  FileCheck2
-} from 'lucide-react';
 
+/**
+ * AboutPage.tsx
+ * -------------------------------------------------------------
+ * Explains project purpose and technical details for the college viva/evaluation.
+ *
+ * Requirements:
+ * "This project is developed as a college project to demonstrate how
+ * a basic scam reporting and verification system can be designed."
+ */
 export const AboutPage: React.FC = () => {
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-12">
-      {/* Header */}
-      <div className="text-center max-w-3xl mx-auto">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sky-950/80 border border-sky-500/30 text-sky-400 text-xs font-mono mb-3">
-          <ShieldAlert className="w-3.5 h-3.5" />
-          <span>Architecture & Governance Charter</span>
-        </div>
-        <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white">
-          About ScamShield
-        </h1>
-        <p className="mt-3 text-sm sm:text-base text-slate-300 leading-relaxed">
-          A decentralized cybersecurity intelligence platform engineered to empower citizens with preemptive fraud verification, crowd-sourced vigilance, and community threat defense.
+    <div className="max-w-4xl mx-auto px-4 py-8">
+      {/* Page Header */}
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">About This Project</h1>
+        <p className="text-sm text-gray-600 mt-1">
+          Project Overview &bull; Basic Scam Reporting and Verification System
         </p>
       </div>
 
-      {/* Origin & Purpose */}
-      <div className="glass-panel p-8 rounded-2xl border border-slate-800 space-y-4">
-        <h2 className="text-xl font-bold text-white">The ScamShield Mission</h2>
-        <p className="text-sm text-slate-300 leading-relaxed">
-          Digital fraud causes hundreds of crores in financial losses each year across banking channels, social media marketplaces, and instant messaging networks. Fraudsters exploit the asymmetric information gap: by the time a scam is reported in traditional media, thousands of innocent users have already fallen victim to identical phone numbers, cloned payment portals, and fraudulent bank accounts.
-        </p>
-        <p className="text-sm text-slate-300 leading-relaxed">
-          <strong>ScamShield</strong> bridges this gap. By turning every citizen into an active threat intelligence node, suspicious numbers and fraudulent links are indexed in real time, allowing anyone to verify a contact before completing a transaction.
-        </p>
-      </div>
-
-      {/* How It Works (Verification & Integrity) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-3">
-          <div className="p-3 rounded-xl bg-sky-950 text-sky-400 border border-sky-500/30 w-fit">
-            <Users className="w-5 h-5" />
-          </div>
-          <h3 className="text-base font-semibold text-white">1. Community Reporting</h3>
-          <p className="text-xs text-slate-400 leading-relaxed">
-            Citizens file incident reports specifying scam categories, loss amounts, platform used, and target identifiers with supporting evidence.
+      <div className="space-y-6">
+        {/* Core Project Statement */}
+        <section className="bg-white border border-gray-300 rounded p-6 shadow-sm">
+          <h2 className="text-lg font-bold text-gray-900 mb-2">Project Brief</h2>
+          <p className="text-sm text-gray-700 leading-relaxed">
+            This project is developed as a college project to demonstrate how a basic scam reporting and verification system can be designed.
           </p>
-        </div>
-
-        <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-3">
-          <div className="p-3 rounded-xl bg-sky-950 text-sky-400 border border-sky-500/30 w-fit">
-            <Database className="w-5 h-5" />
-          </div>
-          <h3 className="text-base font-semibold text-white">2. Algorithmic Normalization</h3>
-          <p className="text-xs text-slate-400 leading-relaxed">
-            Target identifiers (phone numbers, URLs, bank accounts) are sanitized, stripped of formatting discrepancies, and clustered to detect recurrent fraud rings.
+          <p className="text-sm text-gray-700 leading-relaxed mt-2">
+            The platform provides a centralized, community-driven interface where citizens can report suspicious contacts (phone numbers, email addresses, websites) and check incoming communications before falling prey to fraudulent schemes.
           </p>
-        </div>
+        </section>
 
-        <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-3">
-          <div className="p-3 rounded-xl bg-sky-950 text-sky-400 border border-sky-500/30 w-fit">
-            <FileCheck2 className="w-5 h-5" />
+        {/* Objectives */}
+        <section className="bg-white border border-gray-300 rounded p-6 shadow-sm">
+          <h2 className="text-lg font-bold text-gray-900 mb-3">Project Objectives</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-gray-700">
+            <div className="p-3 bg-gray-50 border border-gray-200 rounded">
+              <span className="font-semibold text-gray-900 block mb-1">1. User Incident Reporting</span>
+              Provide a simple, non-intrusive form for users to lodge scam complaints without requiring sensitive financial credentials.
+            </div>
+            <div className="p-3 bg-gray-50 border border-gray-200 rounded">
+              <span className="font-semibold text-gray-900 block mb-1">2. Fast Verification Lookup</span>
+              Allow users to check whether an unknown caller, sender email, or domain has previously been flagged by other victims.
+            </div>
+            <div className="p-3 bg-gray-50 border border-gray-200 rounded">
+              <span className="font-semibold text-gray-900 block mb-1">3. Public Transparency</span>
+              Display submitted reports in a structured table format with review statuses for verification and auditing.
+            </div>
+            <div className="p-3 bg-gray-50 border border-gray-200 rounded">
+              <span className="font-semibold text-gray-900 block mb-1">4. Community Cyber Awareness</span>
+              Educate general users regarding common scam patterns such as job fraud, fake customer care, and phishing links.
+            </div>
           </div>
-          <h3 className="text-base font-semibold text-white">3. Moderation & Audit</h3>
-          <p className="text-xs text-slate-400 leading-relaxed">
-            Security administrators audit evidence, confirm risk ratings, filter malicious or duplicate entries, and preserve an immutable audit trail.
-          </p>
-        </div>
-      </div>
+        </section>
 
-      {/* Privacy Safeguards & Data Masking */}
-      <div className="glass-panel p-8 rounded-2xl border border-slate-800 space-y-4">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
-            <Lock className="w-6 h-6" />
+        {/* System Architecture & Tech Stack */}
+        <section className="bg-white border border-gray-300 rounded p-6 shadow-sm">
+          <h2 className="text-lg font-bold text-gray-900 mb-3">Technology Stack Used</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse border border-gray-200">
+              <thead>
+                <tr className="bg-gray-100 text-gray-700 text-left font-semibold">
+                  <th className="p-2.5 border border-gray-200">Layer</th>
+                  <th className="p-2.5 border border-gray-200">Technology</th>
+                  <th className="p-2.5 border border-gray-200">Purpose in Project</th>
+                </tr>
+              </thead>
+              <tbody className="text-gray-700">
+                <tr>
+                  <td className="p-2.5 border border-gray-200 font-medium">Frontend Framework</td>
+                  <td className="p-2.5 border border-gray-200">React (with TypeScript)</td>
+                  <td className="p-2.5 border border-gray-200">Component-based UI, reactive state handling for forms and search.</td>
+                </tr>
+                <tr>
+                  <td className="p-2.5 border border-gray-200 font-medium">Styling</td>
+                  <td className="p-2.5 border border-gray-200">Tailwind CSS</td>
+                  <td className="p-2.5 border border-gray-200">Clean, simple utility classes with responsive layout.</td>
+                </tr>
+                <tr>
+                  <td className="p-2.5 border border-gray-200 font-medium">Routing</td>
+                  <td className="p-2.5 border border-gray-200">React Router DOM</td>
+                  <td className="p-2.5 border border-gray-200">Seamless navigation between Home, Report, Check, Reports, and Awareness.</td>
+                </tr>
+                <tr>
+                  <td className="p-2.5 border border-gray-200 font-medium">Data Storage</td>
+                  <td className="p-2.5 border border-gray-200">Browser LocalStorage &amp; Firestore</td>
+                  <td className="p-2.5 border border-gray-200">Persistent storage of reports across browser reloads for easy demonstration.</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
-          <div>
-            <h2 className="text-lg font-bold text-white">Privacy Safeguards & Public Masking</h2>
-            <p className="text-xs text-slate-400">Protecting reporters and preventing identity doxxing</p>
-          </div>
-        </div>
+        </section>
 
-        <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-          ScamShield enforces stringent data masking across all public-facing views. While our database analyzes full identifier hashes for precise search matching:
-        </p>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-          <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800">
-            <span className="font-mono text-sky-400 font-bold">Phone Numbers</span>
-            <p className="text-slate-400 mt-1 font-mono">
-              Raw: +91 9876543210 → Display: <strong>+91 98765 XXXXX 10</strong>
-            </p>
+        {/* Viva Q&A / Demonstration Notes */}
+        <section className="bg-white border border-gray-300 rounded p-6 shadow-sm">
+          <h2 className="text-lg font-bold text-gray-900 mb-3">
+            Quick Viva Q&amp;A (For Examiner / Reviewer)
+          </h2>
+          <div className="space-y-3 text-sm text-gray-700">
+            <div className="p-3 bg-gray-50 border border-gray-200 rounded">
+              <p className="font-semibold text-gray-900">Q: How does the verification system work?</p>
+              <p className="mt-1 text-xs sm:text-sm">
+                A: When a user enters a phone number, email, or domain into the "Check a Report" search bar, the service performs substring and normalized digit matching against all reported identifiers in the database. If a match is found, it displays the "Reported" status, report count, and case description.
+              </p>
+            </div>
+            <div className="p-3 bg-gray-50 border border-gray-200 rounded">
+              <p className="font-semibold text-gray-900">Q: How are new reports validated?</p>
+              <p className="mt-1 text-xs sm:text-sm">
+                A: Client-side validation ensures that the email address contains '@' and '.', phone numbers contain exactly 10 numeric digits, and required description fields are filled before saving.
+              </p>
+            </div>
+            <div className="p-3 bg-gray-50 border border-gray-200 rounded">
+              <p className="font-semibold text-gray-900">Q: Why are bank details and Aadhaar numbers not collected?</p>
+              <p className="mt-1 text-xs sm:text-sm">
+                A: By design principle, collecting sensitive banking credentials or government IDs creates privacy and security hazards. A community scam reporting portal only requires the scammer's contact identifier and incident details.
+              </p>
+            </div>
           </div>
-          <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800">
-            <span className="font-mono text-sky-400 font-bold">Bank Accounts</span>
-            <p className="text-slate-400 mt-1 font-mono">
-              Raw: 50100234981245 → Display: <strong>5010****245</strong>
-            </p>
-          </div>
-          <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800">
-            <span className="font-mono text-sky-400 font-bold">Email Addresses</span>
-            <p className="text-slate-400 mt-1 font-mono">
-              Raw: fraudteam@gmail.com → Display: <strong>f***m@gmail.com</strong>
-            </p>
-          </div>
-          <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800">
-            <span className="font-mono text-sky-400 font-bold">Reporter Identity</span>
-            <p className="text-slate-400 mt-1">
-              Reporter email addresses and phone numbers are strictly restricted to admin audit trails.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Engineering Architecture */}
-      <div className="glass-panel p-8 rounded-2xl border border-slate-800 space-y-4">
-        <h2 className="text-lg font-bold text-white flex items-center gap-2">
-          <Code2 className="w-5 h-5 text-sky-400" />
-          <span>Technical Architecture (College Full-Stack Blueprint)</span>
-        </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-          <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
-            <span className="font-mono text-sky-400 font-bold">Frontend Layer</span>
-            <p className="text-slate-300">
-              React 19 SPA, TypeScript, Vite, Tailwind CSS v4, Lucide Icons, Recharts for data analytics, responsive zero-pill cyber design.
-            </p>
-          </div>
-          <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
-            <span className="font-mono text-sky-400 font-bold">Backend API</span>
-            <p className="text-slate-300">
-              Express REST server mounted with Vite middlewares, token authentication, risk evaluation heuristics, and audit trail handlers.
-            </p>
-          </div>
-          <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
-            <span className="font-mono text-sky-400 font-bold">Data & Simulation</span>
-            <p className="text-slate-300">
-              PostgreSQL relational schema (<code className="text-sky-300">database/schema.sql</code>), realistic seed corpus, and local fallback bridge.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Legal & Regulatory Disclaimer */}
-      <div className="p-6 rounded-2xl bg-slate-950 border border-slate-800 text-xs text-slate-400 leading-relaxed space-y-3">
-        <h3 className="text-slate-200 font-bold uppercase tracking-wider font-mono">
-          Statutory Legal Notice & Platform Limitation
-        </h3>
-        <p>
-          1. <strong>No Definitive Certification:</strong> ScamShield provides algorithmic risk scoring based on crowd-sourced reports and publicly audited patterns. A "Safe / No Reports Found" status means no matching complaints currently exist in our database; it does NOT constitute an endorsement or warranty of safety.
-        </p>
-        <p>
-          2. <strong>No Judicial Adjudication:</strong> A report or high-risk badge does not represent a legal indictment or criminal conviction. It reflects community observations filed by citizens.
-        </p>
-        <p>
-          3. <strong>Emergency Protocol:</strong> If you are an active victim of cyber financial fraud, report immediately to <strong>1930</strong> (National Cyber Crime Reporting Portal) and notify your banking institution within the 2-hour golden period.
-        </p>
+        </section>
       </div>
     </div>
   );

@@ -1,18 +1,17 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, UserRole } from '../types/index.ts';
-import { api } from '../services/api.ts';
+import { setCurrentRole } from '../services/simpleReportService.ts';
 
 interface AuthContextType {
   user: User | null;
   token: string | null;
   isAuthenticated: boolean;
   isAdmin: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string, phone?: string) => Promise<void>;
+  login: (email: string, password?: string) => Promise<User>;
+  register: (name: string, email: string, password?: string, phone?: string) => Promise<User>;
   logout: () => void;
-  loginAsDemoUser: () => Promise<void>;
-  loginAsDemoAdmin: () => Promise<void>;
-  switchRole: (role: UserRole) => void;
+  loginAsDemoUser: () => Promise<User>;
+  loginAsDemoAdmin: () => Promise<User>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -37,8 +36,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     if (user) {
       localStorage.setItem(USER_KEY, JSON.stringify(user));
+      setCurrentRole(user.role === 'admin' ? 'admin' : 'user');
     } else {
       localStorage.removeItem(USER_KEY);
+      setCurrentRole('user');
     }
   }, [user]);
 
@@ -50,16 +51,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [token]);
 
-  const login = async (email: string, password: string) => {
-    const res = await api.login(email, password);
-    setUser(res.user);
-    setToken(res.token);
+  /**
+   * Universal Login:
+   * - If email contains 'admin' (e.g. admin@gmail.com, admin@scamshield.com) -> Role: 'admin'
+   * - Otherwise (e.g. user@gmail.com, any gmail) -> Role: 'user'
+   */
+  const login = async (email: string, _password?: string): Promise<User> => {
+    const cleanEmail = email.trim().toLowerCase();
+    const isAdminRole = cleanEmail.includes('admin');
+
+    const loggedUser: User = {
+      id: Date.now(),
+      name: isAdminRole ? 'Portal Administrator' : (cleanEmail.split('@')[0] || 'Citizen User'),
+      email: cleanEmail,
+      role: isAdminRole ? 'admin' : 'user',
+      createdAt: new Date().toISOString(),
+    };
+
+    setUser(loggedUser);
+    setToken(`token_${Date.now()}`);
+    setCurrentRole(isAdminRole ? 'admin' : 'user');
+    return loggedUser;
   };
 
-  const register = async (name: string, email: string, password: string, phone?: string) => {
-    const res = await api.register(name, email, password, phone);
-    setUser(res.user);
-    setToken(res.token);
+  const register = async (name: string, email: string, _password?: string, _phone?: string): Promise<User> => {
+    const cleanEmail = email.trim().toLowerCase();
+    const isAdminRole = cleanEmail.includes('admin');
+
+    const newUser: User = {
+      id: Date.now(),
+      name: name.trim() || 'Citizen User',
+      email: cleanEmail,
+      role: isAdminRole ? 'admin' : 'user',
+      createdAt: new Date().toISOString(),
+    };
+
+    setUser(newUser);
+    setToken(`token_${Date.now()}`);
+    setCurrentRole(isAdminRole ? 'admin' : 'user');
+    return newUser;
   };
 
   const logout = () => {
@@ -67,33 +97,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setToken(null);
     localStorage.removeItem(USER_KEY);
     localStorage.removeItem(TOKEN_KEY);
+    setCurrentRole('user');
   };
 
   const loginAsDemoUser = async () => {
-    await login('user@scamshield.demo', 'Demo@123');
+    return login('user@gmail.com', 'user123');
   };
 
   const loginAsDemoAdmin = async () => {
-    await login('admin@scamshield.demo', 'Admin@123');
-  };
-
-  const switchRole = (role: UserRole) => {
-    if (!user) {
-      if (role === 'admin') loginAsDemoAdmin();
-      else loginAsDemoUser();
-      return;
-    }
-    const updatedUser: User = {
-      ...user,
-      role,
-      name: role === 'admin' ? 'Cyber Security Admin' : 'Aarav Sharma',
-      email: role === 'admin' ? 'admin@scamshield.demo' : 'user@scamshield.demo',
-    };
-    setUser(updatedUser);
+    return login('admin@gmail.com', 'admin123');
   };
 
   const isAuthenticated = !!user;
-  const isAdmin = user?.role === 'admin' || user?.role === 'moderator';
+  const isAdmin = user?.role === 'admin';
 
   return (
     <AuthContext.Provider
@@ -107,7 +123,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         logout,
         loginAsDemoUser,
         loginAsDemoAdmin,
-        switchRole,
       }}
     >
       {children}

@@ -1,177 +1,184 @@
 import React, { useState } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { ShieldAlert, Lock, Mail, ArrowRight, Sparkles, Eye, EyeOff } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.tsx';
-import { useToast } from '../context/ToastContext.tsx';
 
+/**
+ * LoginPage.tsx
+ * -------------------------------------------------------------
+ * Clean, beginner-friendly Login Page for the portal.
+ *
+ * Rules:
+ * 1. If an admin Gmail is given (e.g., admin@gmail.com), logs in as Admin
+ *    and redirects directly to the Admin Dashboard (/admin).
+ * 2. If a regular user Gmail is given (e.g., user@gmail.com), logs in as User
+ *    and redirects directly to the User Dashboard (/user-dashboard).
+ * 3. Includes 1-click demo buttons for instant testing.
+ */
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const location = useLocation();
   const { login, loginAsDemoUser, loginAsDemoAdmin } = useAuth();
-  const { showToast } = useToast();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const redirectPath = (location.state as any)?.from?.pathname || '/dashboard';
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Form submit handler
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) {
-      setError('Please enter both email and password.');
+    if (!email.trim()) {
+      setError('Please enter your email address.');
       return;
     }
+
+    if (!email.includes('@') || !email.includes('.')) {
+      setError('Please enter a valid email address (e.g. admin@gmail.com or user@gmail.com).');
+      return;
+    }
+
     setError('');
     setLoading(true);
+
     try {
-      await login(email, password);
-      showToast('Signed in successfully!', 'success');
-      navigate(redirectPath);
-    } catch (err: any) {
-      setError(err.message || 'Invalid credentials. Try using demo quick-fill.');
-      showToast(err.message || 'Login failed', 'error');
+      const loggedUser = await login(email, password);
+      if (loggedUser.role === 'admin') {
+        navigate('/admin');
+      } else {
+        navigate('/user-dashboard');
+      }
+    } catch {
+      setError('Login failed. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDemoUser = async () => {
-    setLoading(true);
-    try {
-      await loginAsDemoUser();
-      showToast('Logged in as Demo Citizen User', 'success');
-      navigate(redirectPath);
-    } catch (err: any) {
-      showToast('Demo login failed', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDemoAdmin = async () => {
+  // 1-Click Demo Login as Admin
+  const handleQuickAdmin = async () => {
     setLoading(true);
     try {
       await loginAsDemoAdmin();
-      showToast('Logged in as Cyber Security Admin', 'success');
       navigate('/admin');
-    } catch (err: any) {
-      showToast('Admin demo login failed', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 1-Click Demo Login as User
+  const handleQuickUser = async () => {
+    setLoading(true);
+    try {
+      await loginAsDemoUser();
+      navigate('/user-dashboard');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-[80vh] flex items-center justify-center px-4 py-12">
-      <div className="w-full max-w-md space-y-6">
-        {/* Brand */}
-        <div className="text-center space-y-2">
-          <div className="inline-flex p-2.5 rounded-xl bg-sky-950/80 border border-sky-500/40 text-sky-400">
-            <ShieldAlert className="w-8 h-8" />
+    <div className="max-w-md mx-auto px-4 py-12">
+      {/* Box Header */}
+      <div className="bg-white border border-gray-300 rounded shadow-sm p-6 sm:p-8">
+        <div className="text-center mb-6">
+          <div className="w-12 h-12 bg-blue-600 text-white rounded mx-auto flex items-center justify-center font-bold text-xl mb-3">
+            SR
           </div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">
-            Sign In to ScamShield
-          </h1>
-          <p className="text-xs text-slate-400">
-            Access your scam reports, track status updates, and verify suspicious contacts.
+          <h1 className="text-2xl font-bold text-gray-900">Portal Login</h1>
+          <p className="text-xs text-gray-600 mt-1">
+            Sign in to access the Admin Panel or User Dashboard.
           </p>
         </div>
 
-        {/* Quick Demo Credentials Panel */}
-        <div className="glass-panel p-4 rounded-xl border border-sky-500/30 bg-sky-950/20 space-y-2">
-          <div className="flex items-center justify-between text-xs">
-            <span className="font-mono text-sky-400 font-bold flex items-center gap-1">
-              <Sparkles className="w-3.5 h-3.5" /> One-Click Demo Access
-            </span>
-            <span className="text-[10px] text-slate-400 font-mono">No typing required</span>
+        {/* Error message */}
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-300 text-red-800 text-xs rounded">
+            {error}
           </div>
+        )}
 
-          <div className="grid grid-cols-2 gap-2 pt-1">
-            <button
-              type="button"
-              onClick={handleDemoUser}
-              className="px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 hover:border-sky-500 text-slate-200 text-xs font-semibold transition-colors flex flex-col items-start cursor-pointer"
-            >
-              <span className="text-white text-[11px]">Demo Citizen</span>
-              <span className="text-[10px] text-sky-400 font-mono">Aarav Sharma</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleDemoAdmin}
-              className="px-3 py-2 rounded-lg bg-slate-900 border border-purple-800/60 hover:border-purple-500 text-slate-200 text-xs font-semibold transition-colors flex flex-col items-start cursor-pointer"
-            >
-              <span className="text-white text-[11px]">Demo Admin</span>
-              <span className="text-[10px] text-purple-400 font-mono">Security Officer</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Form Container */}
-        <form onSubmit={handleSubmit} className="glass-panel p-6 sm:p-8 rounded-2xl border border-slate-800 space-y-4 shadow-xl">
-          {error && (
-            <div className="p-3 rounded-lg bg-rose-950/50 border border-rose-800/60 text-xs text-rose-300">
-              {error}
-            </div>
-          )}
-
+        {/* Login Form */}
+        <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1">Email Address</label>
-            <div className="relative">
-              <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="user@scamshield.demo"
-                className="w-full pl-9 pr-3.5 py-2.5 rounded-lg bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-xs font-mono focus:ring-2 focus:ring-sky-500 focus:outline-none"
-              />
-            </div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">
+              Email Address (Gmail) <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="e.g. admin@gmail.com or user@gmail.com"
+              className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
+            />
+            <p className="text-[11px] text-gray-500 mt-1">
+              Enter an email containing <code className="bg-gray-100 px-1 font-bold">admin</code> for Admin access, or any user Gmail for Citizen access.
+            </p>
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1">Password</label>
-            <div className="relative">
-              <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full pl-9 pr-10 py-2.5 rounded-lg bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-xs font-mono focus:ring-2 focus:ring-sky-500 focus:outline-none"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
-              >
-                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
-            </div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">
+              Password
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter password (e.g. 123456)"
+              className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
+            />
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2.5 rounded-lg bg-sky-600 hover:bg-sky-500 disabled:bg-slate-800 text-white text-xs font-semibold transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-sky-600/30"
+            className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm rounded transition-colors disabled:opacity-50 cursor-pointer"
           >
-            {loading ? (
-              <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            ) : (
-              <span>Sign In</span>
-            )}
+            {loading ? 'Signing in...' : 'Sign In'}
           </button>
-
-          <div className="pt-2 text-center text-xs text-slate-400">
-            Don't have an account?{' '}
-            <Link to="/register" className="text-sky-400 hover:underline">
-              Register here
-            </Link>
-          </div>
         </form>
+
+        {/* Quick 1-Click Demo Logins */}
+        <div className="mt-6 pt-5 border-t border-gray-200">
+          <p className="text-xs font-semibold text-gray-600 mb-2.5 text-center">
+            Or Click for 1-Click Quick Demo Login:
+          </p>
+
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={handleQuickAdmin}
+              disabled={loading}
+              className="w-full py-2 px-3 bg-red-50 hover:bg-red-100 text-red-800 text-xs font-bold rounded border border-red-300 transition-colors flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <span>🛡️</span>
+              <span>Login as Admin (admin@gmail.com) &rarr;</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleQuickUser}
+              disabled={loading}
+              className="w-full py-2 px-3 bg-blue-50 hover:bg-blue-100 text-blue-800 text-xs font-bold rounded border border-blue-300 transition-colors flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <span>👤</span>
+              <span>Login as Citizen User (user@gmail.com) &rarr;</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Helper Note for Examiners/Students */}
+        <div className="mt-5 p-3 bg-gray-50 border border-gray-200 rounded text-[11px] text-gray-600">
+          <strong>Role Detection Guide:</strong>
+          <ul className="list-disc list-inside mt-1 space-y-0.5">
+            <li><span className="font-semibold text-gray-800">admin@gmail.com</span>: Opens the Admin Panel with report moderation controls.</li>
+            <li><span className="font-semibold text-gray-800">user@gmail.com</span>: Opens the User Dashboard to track reports.</li>
+          </ul>
+        </div>
+
+        <div className="mt-4 text-center">
+          <Link to="/" className="text-xs text-blue-600 hover:underline">
+            &larr; Back to Home Page
+          </Link>
+        </div>
       </div>
     </div>
   );

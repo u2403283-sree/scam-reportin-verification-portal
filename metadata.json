@@ -1,6 +1,6 @@
 {
   "name": "SCAMSHIELD — Scam Reporting & Verification Portal",
-  "description": "Empowering communities to report suspicious scams, verify fraudulent phone numbers, emails, URLs, and UPI IDs, and stay protected online.",
+  "description": "Report scams, verify suspicious phone numbers, email addresses, and website URLs, and view community scam reports.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

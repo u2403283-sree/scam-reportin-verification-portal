@@ -1,0 +1,87 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default-deny all unspecified documents
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'admin@scamshield.demo' ||
+        request.auth.token.email == 'u2403283@rajagiri.edu.in' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isValidReport(data) {
+      return data.reportId is string && data.reportId.size() <= 64
+        && data.title is string && data.title.size() <= 200
+        && data.description is string && data.description.size() <= 5000
+        && data.incidentDate is string && data.incidentDate.size() <= 30
+        && data.reporterName is string && data.reporterName.size() <= 100
+        && data.reporterEmail is string && data.reporterEmail.size() <= 150
+        && data.status in ['Submitted', 'Under Review', 'Verified', 'Rejected'];
+    }
+
+    // Reports collection: Public read for community scam alerts & verification
+    match /reports/{reportId} {
+      allow read: if true;
+      allow create: if isValidId(reportId) && isValidReport(incoming());
+      allow update: if isValidId(reportId) && (
+        isAdmin() ||
+        (isSignedIn() && existing().userId == request.auth.uid)
+      );
+      allow delete: if isAdmin();
+    }
+
+    // Categories: Publicly readable catalog
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Verification searches: Anonymous or authenticated logging
+    match /verificationSearches/{searchId} {
+      allow read: if true;
+      allow create: if isValidId(searchId);
+      allow update, delete: if isAdmin();
+    }
+
+    // User profiles: Isolated to profile owner or admin
+    match /users/{userId} {
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow create, update: if isSignedIn() && request.auth.uid == userId;
+      allow delete: if isAdmin();
+    }
+
+    // Admins list
+    match /admins/{adminId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Health / connection test document
+    match /test/{docId} {
+      allow read: if true;
+    }
+  }
+}
